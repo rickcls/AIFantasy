@@ -1,6 +1,6 @@
 /**
  * Vercel API Route: Generate Scene Text
- * Uses OpenAI API to generate narrative text for game scenes
+ * Uses OpenRouter API to generate narrative text for game scenes
  */
 
 export const runtime = 'nodejs';
@@ -32,7 +32,7 @@ export async function POST(request) {
     const context = await request.json();
 
     const userPrompt = generateUserPrompt(context);
-    const apiKey = process.env.OPENAI_API_KEY;
+    const apiKey = process.env.OPENROUTER_API_KEY;
 
     if (!apiKey) {
       return Response.json({
@@ -41,14 +41,16 @@ export async function POST(request) {
       }, { status: 503 });
     }
 
-    const response = await fetch('https://api.openai.com/v1/chat/completions', {
+    const response = await fetch('https://openrouter.ai/api/v1/chat/completions', {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        'Authorization': `Bearer ${apiKey}`
+        'Authorization': `Bearer ${apiKey}`,
+        'HTTP-Referer': 'https://fanchen-wendao.vercel.app',
+        'X-Title': '凡塵問道'
       },
       body: JSON.stringify({
-        model: 'gpt-4o-mini',
+        model: 'anthropic/claude-3-haiku',
         messages: [
           { role: 'system', content: SYSTEM_PROMPT },
           { role: 'user', content: userPrompt }
@@ -60,7 +62,7 @@ export async function POST(request) {
 
     if (!response.ok) {
       const error = await response.text();
-      console.error('OpenAI API error:', error);
+      console.error('OpenRouter API error:', error);
       return Response.json({ error: 'AI generation failed' }, { status: 500 });
     }
 
