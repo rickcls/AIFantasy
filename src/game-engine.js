@@ -12,6 +12,8 @@ import {
   ROOTS,
 } from "./game-data.js";
 
+import { buildContext, generateSceneText } from "./ai-service.js";
+
 export const STORAGE_KEY = "fanchen-wendao-saves-v1";
 export const MANUAL_SAVE_SLOTS = ["slot-1", "slot-2", "slot-3"];
 export const AUTOSAVE_SLOT = "autosave";
@@ -2498,4 +2500,43 @@ export function getRenderState(state, sceneData, appMode, selectedOptionIndex, a
     null,
     2
   );
+}
+
+let aiEnhancementCache = new Map();
+
+export async function enhanceSceneWithAI(state, scene) {
+  const sceneKey = `${scene.eventId || "hub"}-${state.world.location}-${state.stats.cultivation}`;
+
+  if (aiEnhancementCache.has(sceneKey)) {
+    return aiEnhancementCache.get(sceneKey);
+  }
+
+  const context = buildContext(state, scene);
+  const aiText = await generateSceneText(context);
+
+  if (!aiText) {
+    return null;
+  }
+
+  const enhanced = {
+    ...scene,
+    aiTitle: aiText.title,
+    aiBody: aiText.body,
+    aiOptions: aiText.options?.map((opt, idx) => ({
+      label: opt.label,
+      copy: opt.copy,
+    })),
+  };
+
+  if (aiEnhancementCache.size > 50) {
+    const firstKey = aiEnhancementCache.keys().next().value;
+    aiEnhancementCache.delete(firstKey);
+  }
+  aiEnhancementCache.set(sceneKey, enhanced);
+
+  return enhanced;
+}
+
+export function clearAIEnhancementCache() {
+  aiEnhancementCache.clear();
 }

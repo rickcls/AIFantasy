@@ -18,6 +18,7 @@ import {
   loadSaves,
   randomizeDraft,
   saveToSlot,
+  enhanceSceneWithAI,
 } from "./game-engine.js";
 
 const appRoot = document.querySelector("#app");
@@ -32,6 +33,7 @@ const appState = {
   draft: createDefaultDraft(),
   game: null,
   scene: null,
+  aiScene: null,
   ending: null,
   selectedOptionIndex: 0,
   activeTab: "status",
@@ -48,15 +50,27 @@ function refreshSaves() {
   appState.saves = loadSaves();
 }
 
+async function enhanceCurrentScene() {
+  if (!appState.game || !appState.scene) return;
+
+  const enhanced = await enhanceSceneWithAI(appState.game, appState.scene);
+  if (enhanced && enhanced.aiBody) {
+    appState.aiScene = enhanced;
+    render();
+  }
+}
+
 function startGameFromProfile(profile) {
   appState.game = createNewGame(profile);
   appState.scene = createSceneFromState(appState.game);
+  appState.aiScene = null;
   appState.mode = "game";
   appState.activeTab = "status";
   appState.ending = null;
   appState.selectedOptionIndex = 0;
   persistAutosave();
   render();
+  enhanceCurrentScene();
 }
 
 function persistAutosave() {
@@ -68,8 +82,10 @@ function persistAutosave() {
 function handleTransition(result) {
   if (!result) {
     appState.scene = createSceneFromState(appState.game);
+    appState.aiScene = null;
     persistAutosave();
     render();
+    enhanceCurrentScene();
     return;
   }
   if (result.ending) {
@@ -81,15 +97,19 @@ function handleTransition(result) {
     return;
   }
   appState.scene = result;
+  appState.aiScene = null;
   appState.mode = "game";
   appState.selectedOptionIndex = 0;
   persistAutosave();
   render();
+  enhanceCurrentScene();
 }
 
 function chooseOption(index) {
-  if (!appState.scene || !appState.scene.options[index]) return;
-  const option = appState.scene.options[index];
+  if (!appState.scene) return;
+  const options = appState.scene.options;
+  if (!options || !options[index]) return;
+  const option = options[index];
   const result = option.onChoose();
   handleTransition(result);
 }
@@ -99,12 +119,14 @@ function loadGame(slotId) {
   if (!loaded) return;
   appState.game = hydrateGame(loaded);
   appState.scene = createSceneFromState(appState.game);
+  appState.aiScene = null;
   appState.mode = "game";
   appState.ending = null;
   appState.selectedOptionIndex = 0;
   appState.activeTab = "status";
   persistAutosave();
   render();
+  enhanceCurrentScene();
 }
 
 function saveGame(slotId) {
@@ -420,12 +442,21 @@ function renderGame() {
         <section class="panel">
           <div>
             <span class="ink-badge">${appState.scene.kind === "hub" ? "行動抉擇" : "事件場景"}</span>
-            <h1 class="scene-title">${appState.scene.title}</h1>
+            <h1 class="scene-title">${appState.aiScene?.aiTitle || appState.scene.title}</h1>
           </div>
-          <div class="scene-body">${appState.scene.body}</div>
+          <div class="scene-body">${appState.aiScene?.aiBody || appState.scene.body}</div>
           <div class="footer-help">${resourceSummary}</div>
           <div class="choice-list">
-            ${optionCards(appState.scene.options, appState.selectedOptionIndex)}
+            ${appState.aiScene?.aiOptions
+              ? appState.aiScene.aiOptions.map((opt, idx) => `
+                <button class="choice-btn ${appState.selectedOptionIndex === idx ? "is-selected" : ""}" data-action="scene-choice" data-index="${idx}">
+                  <span class="choice-index">選項 ${idx + 1}</span>
+                  <span class="choice-title">${opt.label}</span>
+                  <span class="choice-copy">${opt.copy}</span>
+                </button>
+              `).join("")
+              : optionCards(appState.scene.options, appState.selectedOptionIndex)
+            }
           </div>
           <div class="footer-row">
             <div class="footer-help">可用方向鍵切換選項，按空白鍵、Enter 或數字 1-5 決定。Playwright 驗證也走同一套控制。</div>
