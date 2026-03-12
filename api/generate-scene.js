@@ -3,8 +3,6 @@
  * Uses OpenRouter API to generate narrative text for game scenes
  */
 
-export const runtime = 'nodejs';
-
 const SYSTEM_PROMPT = `你是一位修仙小說的說書人，專門為文字冒險遊戲撰寫情境描述。
 
 請根據以下遊戲狀態生成情境文本：
